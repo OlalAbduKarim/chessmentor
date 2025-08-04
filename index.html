@@ -1,50 +1,59 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ChessMentor: Your Personal AI Chess Coach</title>
+    <title>ChessMentor AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
+        darkMode: 'class',
         theme: {
           extend: {
             colors: {
-              'brand-primary': '#312E2B',
-              'brand-secondary': '#4A4643',
-              'brand-accent': '#81B64C',
-              'brand-light': '#F0D9B5',
-              'brand-dark': '#1F1E1B',
+              'brand-primary': '#3B82F6', // Blue 500
+              'brand-secondary': '#10B981', // Emerald 500
+              'dark-bg': '#111827', // Gray 900
+              'dark-surface': '#1F2937', // Gray 800
+              'dark-border': '#374151', // Gray 700
+              'dark-text-primary': '#F9FAFB', // Gray 50
+              'dark-text-secondary': '#9CA3AF', // Gray 400
+              'light-bg': '#F9FAFB', // Gray 50
+              'light-surface': '#FFFFFF',
+              'light-border': '#E5E7EB', // Gray 200
+              'light-text-primary': '#111827', // Gray 900
+              'light-text-secondary': '#6B7280', // Gray 500
             },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
             },
           },
         },
-      }
+      };
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.1.1/",
-    "react": "https://esm.sh/react@^19.1.1",
     "@google/genai": "https://esm.sh/@google/genai@^1.12.0",
     "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
-    "firebase/app": "https://esm.sh/firebase@10.12.2/app",
-    "firebase/auth": "https://esm.sh/firebase@10.12.2/auth",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "firebase/app": "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js",
+    "firebase/auth": "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js",
+    "firebase/firestore": "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js",
+    "firebase/storage": "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js",
     "firebase/": "https://esm.sh/firebase@^12.0.0/"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-brand-dark">
+  <body class="bg-light-bg dark:bg-dark-bg">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+  <script type="module" src="/index.tsx"></script>
+</body>
 </html>

@@ -1,6 +1,9 @@
 {
-  "name": "ChessMentor: Your Personal AI Chess Coach",
-  "description": "Your personal AI chess coach. Get AI-powered course suggestions, practice with puzzles, and track your progress from beginner to master with Firebase-powered authentication.",
-  "requestFramePermissions": [],
+  "name": "ChessMentor AI",
+  "description": "An international chess teaching and learning platform connecting students and professional chess coaches, featuring an AI-powered lesson assistant.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
   "prompt": ""
 }

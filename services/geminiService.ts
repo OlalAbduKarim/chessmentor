@@ -1,60 +1,35 @@
+import { GoogleGenAI } from "@google/genai";
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { CourseLevel } from "../types";
-
+// Ensure you have the API_KEY in your environment variables
 const API_KEY = process.env.API_KEY;
 
 if (!API_KEY) {
-  throw new Error("API_KEY environment variable not set");
+  // In a real app, you'd handle this more gracefully, maybe disabling AI features.
+  // For this example, we'll throw an error if the key is missing.
+  console.error("Gemini API key not found. Please set the API_KEY environment variable.");
 }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+const ai = new GoogleGenAI({ apiKey: API_KEY! });
 
-const courseSuggestionSchema = {
-  type: Type.ARRAY,
-  items: {
-    type: Type.OBJECT,
-    properties: {
-      title: {
-        type: Type.STRING,
-        description: "A creative and engaging title for a chess course.",
-      },
-      description: {
-        type: Type.STRING,
-        description: "A short, one-sentence compelling description of what the course covers.",
-      },
-    },
-    required: ["title", "description"],
-  },
-};
-
-export interface AISuggestion {
-  title: string;
-  description: string;
-}
-
-export const getCourseSuggestions = async (level: CourseLevel): Promise<AISuggestion[]> => {
+export const getAIResponseStream = async (lessonTitle: string, userQuery: string) => {
   try {
-    const prompt = `I am a ${level} chess player. Suggest 3 unique and interesting course ideas that would be perfect for me.`;
-    
-    const response = await ai.models.generateContent({
+    const systemInstruction = `You are a friendly and expert chess tutor named ChessMentor AI. 
+The student is currently in a lesson titled "${lessonTitle}". 
+Answer their question clearly, concisely, and in a supportive tone.
+Use markdown for formatting if it helps clarity (e.g., bolding key terms, using lists).
+Do not greet the user, just provide the answer.`;
+
+    const result = await ai.models.generateContentStream({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: userQuery,
       config: {
-        responseMimeType: "application/json",
-        responseSchema: courseSuggestionSchema,
-      },
+        systemInstruction: systemInstruction,
+      }
     });
 
-    const jsonText = response.text.trim();
-    const suggestions = JSON.parse(jsonText);
-    return suggestions as AISuggestion[];
-
+    return result;
   } catch (error) {
-    console.error("Error getting course suggestions from Gemini API:", error);
-    // Return a fallback or throw the error
-    return [
-        { title: "Error Generating Suggestions", description: "Could not connect to the AI service. Please try again later." }
-    ];
+    console.error("Error generating content from Gemini:", error);
+    throw new Error("Failed to get response from AI assistant.");
   }
 };

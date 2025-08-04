@@ -1,116 +1,137 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { User, UserRole, CourseLevel } from './types';
-import SplashScreen from './components/SplashScreen';
-import Onboarding from './components/Onboarding';
-import AuthScreen from './components/AuthScreen';
-import LearnerDashboard from './components/LearnerDashboard';
-import CourseDiscovery from './components/CourseDiscovery';
-import { auth } from './firebase';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { User, UserRole, Page, AppContextType, Coach, Course } from './types';
+import { Auth } from './components/Auth';
+import { StudentDashboard } from './components/StudentDashboard';
+import { Header } from './components/Header';
+import { ExplorePage } from './components/ExplorePage';
+import { CoachProfile } from './components/CoachProfile';
+import { CourseView } from './components/CourseView';
+import { CoachDashboard } from './components/CoachDashboard';
+import { SchedulePage } from './components/SchedulePage';
+import { SessionView } from './components/SessionView';
+import { auth } from './services/firebase';
+import { getUserProfile } from './services/firestoreService';
+import { LoadingSpinner } from './components/icons/Icons';
 
-enum AppState {
-  DASHBOARD,
-  COURSE_DISCOVERY,
-  // COACH_DASHBOARD would be another state
-}
+export const AppContext = React.createContext<AppContextType | null>(null);
 
 const App: React.FC = () => {
-  const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<User | null>(null);
-  const [appState, setAppState] = useState<AppState>(AppState.DASHBOARD);
-  
-  const [hasOnboarded, setHasOnboarded] = useState(() => {
-    return localStorage.getItem('hasOnboarded') === 'true';
-  });
+  const [page, setPage] = useState<Page>(Page.AUTH);
+  const [pageData, setPageData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((firebaseUser) => {
+    const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
-        // In a real app, role and level would be fetched from a database (e.g., Firestore)
-        // Using localStorage as a substitute for this project.
-        const role = localStorage.getItem(`userRole_${firebaseUser.uid}`) as UserRole || UserRole.LEARNER;
-        const level = localStorage.getItem(`userLevel_${firebaseUser.uid}`) as CourseLevel || CourseLevel.BEGINNER;
-
-        const currentUser: User = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          name: firebaseUser.displayName || 'Chess Player',
-          role: role,
-          level: role === UserRole.LEARNER ? level : undefined,
-        };
-        setUser(currentUser);
-        setAppState(AppState.DASHBOARD);
+        try {
+          const userProfile = await getUserProfile(firebaseUser.uid);
+          if (userProfile) {
+            setUser(userProfile);
+            setPage(userProfile.role === UserRole.STUDENT ? Page.STUDENT_DASHBOARD : Page.COACH_DASHBOARD);
+          } else {
+            // New user signed up, profile might not be created yet.
+            // Auth component handles profile creation.
+            // Or this is a state where logout should happen if profile is missing.
+            setUser(null);
+            setPage(Page.AUTH);
+          }
+        } catch (error) {
+          console.error("Error fetching user profile:", error);
+          setUser(null);
+          setPage(Page.AUTH);
+        }
       } else {
         setUser(null);
+        setPage(Page.AUTH);
       }
-      setIsLoading(false);
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
-  const handleLogout = useCallback(async () => {
-    try {
-        await auth.signOut();
-        // The onAuthStateChanged listener will handle setting the user to null.
-    } catch (error) {
-        console.error("Error signing out: ", error);
-    }
+
+  const logout = useCallback(async () => {
+    await auth.signOut();
+    setUser(null);
+    setPage(Page.AUTH);
+    setPageData(null);
   }, []);
 
-  const handleCompleteOnboarding = useCallback(() => {
-    localStorage.setItem('hasOnboarded', 'true');
-    setHasOnboarded(true);
+  const handleSetPage = useCallback(<T,>(newPage: Page, data?: T) => {
+    setPage(newPage);
+    setPageData(data || null);
+    window.scrollTo(0, 0);
   }, []);
 
-  const handleRevisitOnboarding = useCallback(() => {
-    localStorage.removeItem('hasOnboarded');
-    setHasOnboarded(false);
-  }, []);
+  // Login is handled by onAuthStateChanged, so the login function in context can be a no-op or removed
+  // if all login logic is within the Auth component. For now, we'll leave it as part of the context signature.
+  const appContextValue: AppContextType = useMemo(() => ({
+    user,
+    role: user?.role || null,
+    login: () => {}, // Firebase handles this
+    logout,
+    page,
+    pageData,
+    setPage: handleSetPage,
+  }), [user, logout, page, pageData, handleSetPage]);
 
-  const handleBrowseCourses = useCallback(() => {
-    setAppState(AppState.COURSE_DISCOVERY);
-  }, []);
-
-  const handleBackToDashboard = useCallback(() => {
-    setAppState(AppState.DASHBOARD);
-  }, []);
-
-  if (isLoading) {
-    return <SplashScreen />;
-  }
-
-  if (!hasOnboarded) {
-    return <Onboarding onComplete={handleCompleteOnboarding} />;
-  }
-
-  if (!user) {
-    return <AuthScreen onRevisitOnboarding={handleRevisitOnboarding} />;
-  }
-
-  // --- Authenticated App ---
-  
   const renderContent = () => {
-    switch (appState) {
-      case AppState.DASHBOARD:
-        if (user.role === UserRole.LEARNER) {
-          return <LearnerDashboard user={user} onBrowseCourses={handleBrowseCourses} onLogout={handleLogout} />;
-        }
-        // Add CoachDashboard here when ready
-        return <div>Coach Dashboard (Coming Soon)</div>;
+    if (loading) {
+      return (
+        <div className="flex items-center justify-center h-screen">
+          <LoadingSpinner className="w-12 h-12 animate-spin text-brand-primary" />
+        </div>
+      );
+    }
 
-      case AppState.COURSE_DISCOVERY:
-          return <CourseDiscovery 
-            user={user} 
-            onBack={handleBackToDashboard}
-            onLogoutClick={handleLogout}
-          />;
+    if (!user) {
+      return <Auth />;
+    }
+
+    switch (page) {
+      case Page.STUDENT_DASHBOARD:
+        return <StudentDashboard user={user} setPage={handleSetPage} />;
+      case Page.COACH_DASHBOARD:
+        return <CoachDashboard user={user as Coach} setPage={handleSetPage} />;
+      case Page.EXPLORE:
+        return <ExplorePage onSelectCoach={(coach: Coach) => handleSetPage(Page.COACH_PROFILE, { coach })} />;
+      case Page.COACH_PROFILE:
+        return <CoachProfile 
+                    coach={pageData?.coach} 
+                    coachId={pageData?.coachId}
+                    onBack={() => handleSetPage(Page.EXPLORE)}
+                    onViewCourse={(course: Course) => handleSetPage(Page.COURSE_VIEW, { course })}
+                    setPage={handleSetPage}
+                />;
+      case Page.COURSE_VIEW:
+        return <CourseView 
+                    course={pageData.course}
+                    onBack={() => handleSetPage(Page.COACH_PROFILE, { coachId: pageData.course.coachId })}
+                />;
+      case Page.SCHEDULE:
+        return <SchedulePage user={user} setPage={handleSetPage} />;
+      case Page.SESSION_VIEW:
+        return <SessionView session={pageData.session} onBack={() => handleSetPage(Page.SCHEDULE)} />;
+      case Page.AUTH:
       default:
-        // Fallback to dashboard
-        return <LearnerDashboard user={user} onBrowseCourses={handleBrowseCourses} onLogout={handleLogout} />;
+        return <Auth />;
     }
   };
 
-  return <div className="antialiased">{renderContent()}</div>;
+  return (
+    <AppContext.Provider value={appContextValue}>
+      <div className="min-h-screen font-sans text-light-text-primary dark:text-dark-text-primary">
+        {user && (
+            <Header user={user} logout={logout} setPage={handleSetPage} currentRole={user.role} />
+        )}
+        <main>
+          {renderContent()}
+        </main>
+      </div>
+    </AppContext.Provider>
+  );
 };
 
 export default App;
