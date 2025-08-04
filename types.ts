@@ -77,4 +77,6 @@ export interface AppContextType {
   page: Page;
   pageData: any;
   setPage: <T,>(page: Page, data?: T) => void;
+  theme: 'light' | 'dark';
+  toggleTheme: () => void;
 }

@@ -1,32 +1,25 @@
 import { GoogleGenAI } from "@google/genai";
 
-let ai: GoogleGenAI | null = null;
+// Ensure you have the API_KEY in your environment variables
+const API_KEY = process.env.API_KEY;
 
-const getAiClient = (): GoogleGenAI => {
-    if (ai) {
-        return ai;
-    }
-    const API_KEY = process.env.API_KEY;
-    if (!API_KEY) {
-        const errorMessage = "Gemini API key not found. Please set the API_KEY environment variable in your deployment settings.";
-        console.error(errorMessage);
-        throw new Error(errorMessage);
-    }
-    ai = new GoogleGenAI({ apiKey: API_KEY });
-    return ai;
+if (!API_KEY) {
+  // In a real app, you'd handle this more gracefully, maybe disabling AI features.
+  // For this example, we'll throw an error if the key is missing.
+  console.error("Gemini API key not found. Please set the API_KEY environment variable.");
 }
+
+const ai = new GoogleGenAI({ apiKey: API_KEY! });
 
 export const getAIResponseStream = async (lessonTitle: string, userQuery: string) => {
   try {
-    const client = getAiClient(); // Initialize lazily
-
     const systemInstruction = `You are a friendly and expert chess tutor named ChessMentor AI. 
 The student is currently in a lesson titled "${lessonTitle}". 
 Answer their question clearly, concisely, and in a supportive tone.
 Use markdown for formatting if it helps clarity (e.g., bolding key terms, using lists).
 Do not greet the user, just provide the answer.`;
 
-    const result = await client.models.generateContentStream({
+    const result = await ai.models.generateContentStream({
       model: "gemini-2.5-flash",
       contents: userQuery,
       config: {

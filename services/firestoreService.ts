@@ -1,5 +1,40 @@
 import { db } from './firebase';
 import { User, Coach, Course, Session, UserRole } from '../types';
+import { MOCK_COACHES, MOCK_COURSES } from './mockData';
+
+// Seed the database with initial data if it's empty
+export const seedDatabase = async () => {
+    const usersRef = db.collection('users');
+    const coursesRef = db.collection('courses');
+
+    const usersSnap = await usersRef.limit(1).get();
+    const coursesSnap = await coursesRef.limit(1).get();
+
+    if (usersSnap.empty && coursesSnap.empty) {
+        console.log("Database appears to be empty. Seeding with mock data...");
+        try {
+            const batch = db.batch();
+            
+            // Seed coaches (who are also users)
+            MOCK_COACHES.forEach(coach => {
+                const docRef = usersRef.doc(coach.id);
+                batch.set(docRef, coach);
+            });
+            
+            // Seed courses
+            MOCK_COURSES.forEach(course => {
+                const docRef = coursesRef.doc(course.id);
+                batch.set(docRef, course);
+            });
+            
+            await batch.commit();
+            console.log("Database seeded successfully!");
+        } catch (error) {
+            console.error("Error seeding database: ", error);
+        }
+    }
+};
+
 
 // Fetch a single user profile from 'users' collection
 export const getUserProfile = async (uid: string): Promise<User | null> => {

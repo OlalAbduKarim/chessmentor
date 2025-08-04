@@ -9,8 +9,8 @@ import { CourseView } from './components/CourseView';
 import { CoachDashboard } from './components/CoachDashboard';
 import { SchedulePage } from './components/SchedulePage';
 import { SessionView } from './components/SessionView';
-import { auth } from './services/firebase';
-import { getUserProfile } from './services/firestoreService';
+import { auth, db } from './services/firebase';
+import { getUserProfile, seedDatabase } from './services/firestoreService';
 import { LoadingSpinner } from './components/icons/Icons';
 
 export const AppContext = React.createContext<AppContextType | null>(null);
@@ -20,24 +20,59 @@ const App: React.FC = () => {
   const [page, setPage] = useState<Page>(Page.AUTH);
   const [pageData, setPageData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const storedPrefs = window.localStorage.getItem('theme');
+      if (storedPrefs === 'light' || storedPrefs === 'dark') {
+        return storedPrefs;
+      }
+      const userMedia = window.matchMedia('(prefers-color-scheme: dark)');
+      if (userMedia.matches) {
+        return 'dark';
+      }
+    }
+    return 'light';
+  });
+
+  // Effect to apply the theme class to the root element and save to localStorage
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove(theme === 'dark' ? 'light' : 'dark');
+    root.classList.add(theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
   useEffect(() => {
+    // On initial app load, check if the database needs to be seeded with mock data.
+    seedDatabase();
+
     const unsubscribe = auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          const userProfile = await getUserProfile(firebaseUser.uid);
-          if (userProfile) {
-            setUser(userProfile);
-            setPage(userProfile.role === UserRole.STUDENT ? Page.STUDENT_DASHBOARD : Page.COACH_DASHBOARD);
-          } else {
-            // New user signed up, profile might not be created yet.
-            // Auth component handles profile creation.
-            // Or this is a state where logout should happen if profile is missing.
-            setUser(null);
-            setPage(Page.AUTH);
+          let userProfile = await getUserProfile(firebaseUser.uid);
+          
+          if (!userProfile) {
+            // If user exists in Firebase Auth but not in our Firestore db,
+            // create a default student profile for them. This makes the app resilient
+            // and fixes the race condition on new sign-ups.
+            console.warn(`User ${firebaseUser.uid} found in Auth but not in Firestore. Creating default profile.`);
+            const newUser: User = {
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'New User',
+              email: firebaseUser.email!,
+              avatarUrl: firebaseUser.photoURL || `https://i.pravatar.cc/150?u=${firebaseUser.uid}`,
+              role: UserRole.STUDENT,
+            };
+            await db.collection('users').doc(firebaseUser.uid).set(newUser);
+            userProfile = newUser;
           }
+    
+          setUser(userProfile);
+          setPage(userProfile.role === UserRole.STUDENT ? Page.STUDENT_DASHBOARD : Page.COACH_DASHBOARD);
+          
         } catch (error) {
-          console.error("Error fetching user profile:", error);
+          console.error("Error during auth state change:", error);
+          await auth.signOut();
           setUser(null);
           setPage(Page.AUTH);
         }
@@ -51,6 +86,9 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, []);
 
+  const toggleTheme = useCallback(() => {
+    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
+  }, []);
 
   const logout = useCallback(async () => {
     await auth.signOut();
@@ -65,8 +103,6 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   }, []);
 
-  // Login is handled by onAuthStateChanged, so the login function in context can be a no-op or removed
-  // if all login logic is within the Auth component. For now, we'll leave it as part of the context signature.
   const appContextValue: AppContextType = useMemo(() => ({
     user,
     role: user?.role || null,
@@ -75,7 +111,9 @@ const App: React.FC = () => {
     page,
     pageData,
     setPage: handleSetPage,
-  }), [user, logout, page, pageData, handleSetPage]);
+    theme,
+    toggleTheme,
+  }), [user, logout, page, pageData, handleSetPage, theme, toggleTheme]);
 
   const renderContent = () => {
     if (loading) {
@@ -108,7 +146,7 @@ const App: React.FC = () => {
       case Page.COURSE_VIEW:
         return <CourseView 
                     course={pageData.course}
-                    onBack={() => handleSetPage(Page.COACH_PROFILE, { coachId: pageData.course.coachId })}
+                    onBack={() => handleSetPage(Page.COACH_PROFILE, { coachId: pageData.course.courseId })}
                 />;
       case Page.SCHEDULE:
         return <SchedulePage user={user} setPage={handleSetPage} />;
@@ -116,7 +154,10 @@ const App: React.FC = () => {
         return <SessionView session={pageData.session} onBack={() => handleSetPage(Page.SCHEDULE)} />;
       case Page.AUTH:
       default:
-        return <Auth />;
+        // Failsafe: If a user is logged in, always show a dashboard, never the Auth page.
+        return user.role === UserRole.STUDENT 
+            ? <StudentDashboard user={user} setPage={handleSetPage} /> 
+            : <CoachDashboard user={user as Coach} setPage={handleSetPage} />;
     }
   };
 
@@ -124,7 +165,13 @@ const App: React.FC = () => {
     <AppContext.Provider value={appContextValue}>
       <div className="min-h-screen font-sans text-light-text-primary dark:text-dark-text-primary">
         {user && (
-            <Header user={user} logout={logout} setPage={handleSetPage} currentRole={user.role} />
+            <Header 
+                user={user} 
+                logout={logout} 
+                setPage={handleSetPage} 
+                currentRole={user.role} 
+                currentPage={page} 
+            />
         )}
         <main>
           {renderContent()}
