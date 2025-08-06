@@ -1,9 +1,5 @@
 {
-  "name": "ChessMentor AI",
-  "description": "An international chess teaching and learning platform connecting students and professional chess coaches, featuring an AI-powered lesson assistant.",
-  "requestFramePermissions": [
-    "camera",
-    "microphone"
-  ],
-  "prompt": ""
+  "name": "ChessMaster Academy",
+  "description": "A global platform specifically designed for teaching and learning chess. The platform offers live and private coaching, structured course levels, and real-time interaction between coaches and students.",
+  "requestFramePermissions": []
 }
